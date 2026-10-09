@@ -1,9 +1,9 @@
 [package]
 name = "contracts"
+repository.workspace = true
 description = "Ranger Vehicle SDK/Runtime 共享 DTO、transport envelope 和 schema 协商类型"
 version.workspace = true
 edition.workspace = true
-repository.workspace = true
 
 [dependencies]
 serde = { workspace = true }

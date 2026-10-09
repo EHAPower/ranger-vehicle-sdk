@@ -1,15 +1,5 @@
-# SDK Docs
+# SDK 文档
 
-本目录保存 Ranger Client SDK 的 API、兼容性和发布说明。
+本目录保存接口迁移期间仍适用的说明。独立仓只保留 Rust Client、`contracts` 和 schema 输入；Runtime implementation、profile checker、部署脚本和车辆级设计文档仍在 `ranger-vehicle-runtime`（原 `ranger-server`），不能在此目录假定它们已随接口迁移。
 
-计划文档：
-
-| 文档 | 用途 |
-|------|------|
-| `api.md` | Server API、request / response、receipt、diagnostics subscription |
-| `compatibility.md` | SDK version、Server API schema version、release compatibility |
-| `schema.md` | command / event / telemetry schema 说明和生成 / 校验规则 |
-| `errors.md` | 错误码、超时、拒绝原因、执行状态解释 |
-| `auth.md` | client identity、权限、审计和安全边界 |
-
-这些文件在对应 open question 或 spec 关闭前不应伪造稳定合同。当前正式集合和 hash 规则只在 [schema 说明](../schema/README.md) 维护；车辆接口与 profile 语义分别归 [docs/specs/ranger-vehicle-interface.md](https://github.com/EHAPower/ranger-vehicle-runtime/blob/main/docs/specs/ranger-vehicle-interface.md) 和 [docs/specs/ranger-platform-profile.md](https://github.com/EHAPower/ranger-vehicle-runtime/blob/main/docs/specs/ranger-platform-profile.md)。没有运行消费者的 parameter schema 已退出正式集合，通用参数写入仍未实现。三项 Server API schema 已实现 exact version/hash negotiation；DTO codegen 尚未实现。Runtime 的 checker 和真实 Server 集成测试消费本仓固定 SDK revision，不属于 SDK 的反向依赖。
+当前 Rust API、错误语义和 transport 实现在 `../rust/`，机器可读输入在 `../schema/`。完整 API、兼容性、权限和发布说明应随跨仓消费者切换逐步补齐；在 Server 实际支持前，不得把计划中的 `ModeRequest`、schema negotiation 或整车 stop confirmation 写成稳定 SDK 合同。

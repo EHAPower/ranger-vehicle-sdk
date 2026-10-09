@@ -9,7 +9,7 @@ use std::fmt;
 pub const MAGIC: [u8; 4] = *b"RNG1";
 
 /// 当前 wire protocol version。
-pub const WP_VER_CURRENT: u8 = 0x02;
+pub const WP_VER_CURRENT: u8 = 0x01;
 
 /// Envelope header 固定 11 字节。
 pub const HEADER_LEN: usize = 4 + 1 + 1 + 4; // magic + wp_ver + msg_kind + payload_len
@@ -32,13 +32,6 @@ pub enum MsgKind {
     DiagnosticsSnapshot = 12,
     ServerError = 13,
     EhaFaultResetCommand = 14,
-    ModeRequest = 15,
-    ClearFaultsRequest = 16,
-    OperationQuery = 17,
-    OperationReceipt = 18,
-    OperationEvent = 19,
-    ReadinessQuery = 20,
-    ReadinessSnapshot = 21,
 }
 
 impl MsgKind {
@@ -58,13 +51,6 @@ impl MsgKind {
             12 => Some(Self::DiagnosticsSnapshot),
             13 => Some(Self::ServerError),
             14 => Some(Self::EhaFaultResetCommand),
-            15 => Some(Self::ModeRequest),
-            16 => Some(Self::ClearFaultsRequest),
-            17 => Some(Self::OperationQuery),
-            18 => Some(Self::OperationReceipt),
-            19 => Some(Self::OperationEvent),
-            20 => Some(Self::ReadinessQuery),
-            21 => Some(Self::ReadinessSnapshot),
             _ => None,
         }
     }
@@ -205,13 +191,6 @@ impl fmt::Display for MsgKind {
             Self::DiagnosticsSnapshot => "DiagnosticsSnapshot",
             Self::ServerError => "ServerError",
             Self::EhaFaultResetCommand => "EhaFaultResetCommand",
-            Self::ModeRequest => "ModeRequest",
-            Self::ClearFaultsRequest => "ClearFaultsRequest",
-            Self::OperationQuery => "OperationQuery",
-            Self::OperationReceipt => "OperationReceipt",
-            Self::OperationEvent => "OperationEvent",
-            Self::ReadinessQuery => "ReadinessQuery",
-            Self::ReadinessSnapshot => "ReadinessSnapshot",
         })
     }
 }

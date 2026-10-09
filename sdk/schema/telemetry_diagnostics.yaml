@@ -1,6 +1,6 @@
 schema_kind: ranger.schema.v1
 schema_id: telemetry_diagnostics
-schema_version: ranger.telemetry_diagnostics.v2
+schema_version: ranger.telemetry_diagnostics.v1
 title: Ranger telemetry and diagnostics schema
 status: active
 owner: sdk/schema
@@ -10,7 +10,8 @@ compatibility:
   stable_id_policy: never_reuse
   migration_required: true
 hash:
-  canonicalization: semantic_projection_v2
+  canonicalization: yaml_to_canonical_json_v1
+  aggregate_member: true
   semantic_inputs:
     - schema_kind
     - schema_id
@@ -160,7 +161,7 @@ structures:
         unit: sha256
       - name: check_registry_hash
         type: sha256
-        required: false
+        required: true
         unit: sha256
       - name: ignored_check_count
         type: uint64
@@ -174,34 +175,6 @@ structures:
         type: array
         required: true
         items: BackendReadinessSummary
-      - name: operation_mode
-        type: enum
-        required: true
-        enum_values: [standby, manual, auto, maintenance, self_test]
-      - name: safety_state
-        type: enum
-        required: true
-        enum_values: [normal, degraded_hold, controlled_stop, fault_latched, estop_latched]
-      - name: motion_enable
-        type: object
-        required: true
-      - name: command_epoch
-        type: uint64
-        required: true
-        unit: count
-      - name: active_operation_id
-        type: string
-        required: false
-      - name: active_operation_phase
-        type: enum
-        required: false
-        enum_values: [accepted, stopping, awaiting_stop_confirmation, entering_target_mode, running, safe_exit, completed, failed, timed_out, aborted]
-  - name: ReadinessQuery
-    description: Read-only request for the complete current readiness snapshot.
-    fields:
-      - name: request_id
-        type: uint64
-        required: true
   - name: BackendReadinessSummary
     description: Backend instance readiness rendered for diagnostics clients without touching RT paths.
     fields:
@@ -242,56 +215,3 @@ structures:
         type: array
         required: true
         items: string
-  - name: OperationMode
-    description: Vehicle operation mode selected only by ModeRequest.
-    fields:
-      - name: value
-        type: enum
-        required: true
-        enum_values:
-          - standby
-          - manual
-          - auto
-          - maintenance
-          - self_test
-  - name: SafetyState
-    description: Safety overlay independent of operation mode.
-    fields:
-      - name: value
-        type: enum
-        required: true
-        enum_values:
-          - normal
-          - degraded_hold
-          - controlled_stop
-          - fault_latched
-          - estop_latched
-  - name: MotionEnable
-    description: Explicit motion admission decision; missing capability remains denied.
-    fields:
-      - name: state
-        type: enum
-        required: true
-        enum_values:
-          - allowed
-          - denied
-      - name: reason_code
-        type: string
-        required: false
-  - name: OperationPhase
-    description: Current phase of a lifecycle operation.
-    fields:
-      - name: value
-        type: enum
-        required: true
-        enum_values:
-          - accepted
-          - stopping
-          - awaiting_stop_confirmation
-          - entering_target_mode
-          - running
-          - safe_exit
-          - completed
-          - failed
-          - timed_out
-          - aborted

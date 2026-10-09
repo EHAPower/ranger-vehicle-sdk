@@ -1,7 +1,7 @@
 //! Ranger Vehicle Runtime 的最小同步 Rust Client SDK。
 //!
 //! 本 crate 只封装 Linux Unix domain `SOCK_SEQPACKET` transport、control session
-//! 和车辆级 motion / lifecycle 请求，不包含硬件访问、安全策略或自动重连。
+//! 和车辆级 motion/stop 请求，不包含硬件访问、安全策略或自动重连。
 
 use std::os::fd::{AsRawFd, OwnedFd};
 use std::path::PathBuf;
@@ -10,10 +10,6 @@ use std::time::{Duration, Instant};
 use contracts::generated::command::{
     ClockDomain, CommandTarget, ControlFrame, EhaFaultResetCommand, FrameHeader, Resource,
     StopCommand, UnitSpec, VehicleCommand,
-};
-pub use contracts::generated::lifecycle::{
-    ClearFaultsRequest, MotionEnable, OperationEvent, OperationMode, OperationQuery,
-    OperationReceipt, OperationReceiptStatus, ReadinessQuery, ReadinessSnapshot, SessionGrant,
 };
 pub use contracts::generated::receipt::{GateReceipt, ReceiptStatus};
 use contracts::generated::session::{
@@ -24,9 +20,6 @@ use contracts::transport::bootstrap::{
     ConnectRequest, ConnectResponse, ConnectStatusRepr, SessionTypeRepr,
 };
 use contracts::transport::envelope::{Envelope, EnvelopeError, HEADER_LEN, MsgKind};
-use contracts::transport::schema_manifest::{
-    strict_api_schema_manifest, validate_strict_api_schema_response,
-};
 use nix::errno::Errno;
 use nix::sys::socket::{
     AddressFamily, MsgFlags, SockFlag, SockType, UnixAddr, connect, recv, send, socket,
@@ -101,14 +94,11 @@ pub enum ClientError {
     #[error("profile_id 不能为空")]
     EmptyProfileId,
 
-    #[error("operation reason 不能为空")]
-    EmptyOperationReason,
+    #[error("stop reason 不能为空")]
+    EmptyStopReason,
 
     #[error("EHA 故障复位 reason 不能为空")]
     EmptyEhaFaultResetReason,
-
-    #[error("operation_id 不能为空")]
-    EmptyOperationId,
 
     #[error("CLOCK_MONOTONIC 时间超出 u64 纳秒范围")]
     ClockOutOfRange,
@@ -123,7 +113,6 @@ pub struct ControlClient {
     session_id: u64,
     heartbeat_interval: Duration,
     command_default_valid_for_ms: u64,
-    grant: SessionGrant,
     last_heartbeat_at: Instant,
     next_request_id: u64,
     next_sequence: u64,
@@ -145,13 +134,8 @@ impl ControlClient {
     }
 
     /// 发送一个车辆级 motion frame，并返回 Server gate receipt。
-    ///
-    /// mode 与 epoch 是调用方显式观察到的 compare-and-reject 断言；SDK 不缓存、
-    /// 推断或自动更新它们，也不会借此切换 mode。
     pub fn send_motion(
         &mut self,
-        expected_mode: OperationMode,
-        command_epoch: u64,
         profile_id: &str,
         command: VehicleMotionCommand,
     ) -> Result<GateReceipt> {
@@ -168,8 +152,6 @@ impl ControlClient {
             header: self.frame_header(request_id)?,
             sequence,
             valid_for_ms: self.command_default_valid_for_ms,
-            expected_mode,
-            command_epoch,
             profile_id: profile_id.to_owned(),
             commands: vec![VehicleCommand {
                 command_id: format!("motion-{request_id}"),
@@ -217,118 +199,20 @@ impl ControlClient {
         Ok(())
     }
 
-    /// 请求受控停止。Accepted 只表示 operation 已接纳；调用方必须查询 operation
-    /// event 获取 terminal backend confirmation。
-    pub fn stop(
-        &mut self,
-        expected_mode: OperationMode,
-        command_epoch: u64,
-        reason: &str,
-    ) -> Result<OperationReceipt> {
+    /// 请求车辆进入更安全的停止状态，并返回同步 gate receipt。
+    pub fn stop(&mut self, reason: &str) -> Result<GateReceipt> {
         if reason.is_empty() {
-            return Err(ClientError::EmptyOperationReason);
+            return Err(ClientError::EmptyStopReason);
         }
         self.heartbeat_if_due()?;
-        let (request_id, sequence) = self.take_request_and_sequence()?;
+        let request_id = self.take_request_id()?;
         let command = StopCommand {
             header: self.frame_header(request_id)?,
-            sequence,
-            valid_for_ms: self.command_default_valid_for_ms,
-            expected_mode,
-            command_epoch,
             reason_code: reason.to_owned(),
         };
         let envelope = Envelope::with_bincode_payload(MsgKind::StopCommand, &command)?;
         self.send_envelope(&envelope)?;
-        self.receive_operation_receipt(request_id)
-    }
-
-    /// 唯一的 operation mode 切换入口。
-    pub fn request_mode(
-        &mut self,
-        expected_mode: OperationMode,
-        command_epoch: u64,
-        target_mode: OperationMode,
-        reason: &str,
-    ) -> Result<OperationReceipt> {
-        if reason.is_empty() {
-            return Err(ClientError::EmptyOperationReason);
-        }
-        self.heartbeat_if_due()?;
-        let request_id = self.take_request_id()?;
-        let request = contracts::generated::lifecycle::ModeRequest {
-            header: self.frame_header(request_id)?,
-            valid_for_ms: self.command_default_valid_for_ms,
-            expected_mode,
-            command_epoch,
-            target_mode,
-            reason_code: reason.to_owned(),
-        };
-        self.send_envelope(&Envelope::with_bincode_payload(
-            MsgKind::ModeRequest,
-            &request,
-        )?)?;
-        self.receive_operation_receipt(request_id)
-    }
-
-    /// 请求监督器按 fault blocker 和 clear gate 尝试清除锁存故障。
-    pub fn clear_faults(
-        &mut self,
-        expected_mode: OperationMode,
-        command_epoch: u64,
-        reason: &str,
-    ) -> Result<OperationReceipt> {
-        if reason.is_empty() {
-            return Err(ClientError::EmptyOperationReason);
-        }
-        self.heartbeat_if_due()?;
-        let request_id = self.take_request_id()?;
-        let request = ClearFaultsRequest {
-            header: self.frame_header(request_id)?,
-            valid_for_ms: self.command_default_valid_for_ms,
-            expected_mode,
-            command_epoch,
-            reason_code: reason.to_owned(),
-        };
-        self.send_envelope(&Envelope::with_bincode_payload(
-            MsgKind::ClearFaultsRequest,
-            &request,
-        )?)?;
-        self.receive_operation_receipt(request_id)
-    }
-
-    /// 查询 operation 的最新可审计事件；terminal event 才能证明已完成。
-    pub fn query_operation(&mut self, operation_id: &str) -> Result<OperationEvent> {
-        if operation_id.is_empty() {
-            return Err(ClientError::EmptyOperationId);
-        }
-        self.heartbeat_if_due()?;
-        let request_id = self.take_request_id()?;
-        let query = OperationQuery {
-            request_id,
-            operation_id: operation_id.to_owned(),
-        };
-        self.send_envelope(&Envelope::with_bincode_payload(
-            MsgKind::OperationQuery,
-            &query,
-        )?)?;
-        self.receive_typed(MsgKind::OperationEvent)
-    }
-
-    /// 读取当前 mode、安全、epoch 与 backend capability readiness。
-    pub fn readiness(&mut self) -> Result<ReadinessSnapshot> {
-        self.heartbeat_if_due()?;
-        let request_id = self.take_request_id()?;
-        self.send_envelope(&Envelope::with_bincode_payload(
-            MsgKind::ReadinessQuery,
-            &ReadinessQuery { request_id },
-        )?)?;
-        self.receive_typed(MsgKind::ReadinessSnapshot)
-    }
-
-    /// 返回 session handshake 冻结的 grant；它不会因本地状态推断而变化。
-    pub fn grant(&self) -> &SessionGrant {
-        &self.grant
+        self.receive_receipt(request_id)
     }
 
     /// 请求复位 EHA 域故障锁存（`eha_domain_fault`，isolated 款式），并返回
@@ -370,11 +254,6 @@ impl ControlClient {
             session_id: 0,
             heartbeat_interval: Duration::ZERO,
             command_default_valid_for_ms: 0,
-            grant: SessionGrant {
-                allowed_modes: Vec::new(),
-                allowed_operations: Vec::new(),
-                capability_hash: None,
-            },
             last_heartbeat_at: Instant::now(),
             next_request_id: 1,
             next_sequence: 1,
@@ -382,7 +261,8 @@ impl ControlClient {
 
         let connect_request = ConnectRequest {
             sdk_version: env!("CARGO_PKG_VERSION").to_owned(),
-            schemas: strict_api_schema_manifest(),
+            // 当前 Server 尚未返回 schema negotiation；见 sdk/README.md 的兼容限制。
+            schemas: Vec::new(),
         };
         let envelope = connect_request
             .encode_envelope()
@@ -397,8 +277,6 @@ impl ControlClient {
         if connect_response.status != ConnectStatusRepr::Ok {
             return Err(ClientError::ConnectRejected(connect_response.status));
         }
-        validate_strict_api_schema_response(&connect_response.schemas)
-            .map_err(ClientError::Protocol)?;
         if !connect_response
             .allowed_session_types
             .contains(&SessionTypeRepr::Control)
@@ -427,7 +305,6 @@ impl ControlClient {
         client.session_id = session.session_id;
         client.heartbeat_interval = Duration::from_millis(session.heartbeat_interval_ms);
         client.command_default_valid_for_ms = session.command_default_valid_for_ms;
-        client.grant = session.grant;
         client.last_heartbeat_at = Instant::now();
         Ok(client)
     }
@@ -480,23 +357,6 @@ impl ControlClient {
             });
         }
         Ok(receipt)
-    }
-
-    fn receive_operation_receipt(&self, request_id: u64) -> Result<OperationReceipt> {
-        let receipt: OperationReceipt = self.receive_typed(MsgKind::OperationReceipt)?;
-        if receipt.request_id != request_id {
-            return Err(ClientError::RequestIdMismatch {
-                expected: request_id,
-                actual: receipt.request_id,
-            });
-        }
-        Ok(receipt)
-    }
-
-    fn receive_typed<T: serde::de::DeserializeOwned>(&self, expected: MsgKind) -> Result<T> {
-        let envelope = self.receive_expected(expected)?;
-        contracts::transport::codec::deserialize(&envelope.payload, u64::from(self.max_frame_bytes))
-            .map_err(|error| ClientError::Protocol(format!("{expected} 解码失败：{error}")))
     }
 
     fn send_envelope(&self, envelope: &Envelope) -> Result<()> {

@@ -1,4 +1,4 @@
-//! GateReceipt 和 legacy Stop 专用 ExecutionEvent DTO。
+//! v1 GateReceipt 和 Stop 专用 ExecutionEvent DTO。
 //!
 //! 对应 `sdk/schema/receipt_event.yaml`。
 
@@ -21,7 +21,7 @@ pub enum ReceiptStatus {
     Rejected = 1,
 }
 
-/// legacy Stop 专用异步 execution event。
+/// v1 Stop 专用异步 execution event。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StopExecutionEvent {
     pub event_id: String,

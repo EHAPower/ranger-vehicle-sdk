@@ -5,7 +5,7 @@ title: Ranger release/profile checker registry
 status: active
 owner: sdk/schema
 hash:
-  canonicalization: semantic_projection_v2
+  canonicalization: yaml_to_canonical_json_v1
   semantic_inputs:
     - registry_kind
     - registry_id
@@ -83,8 +83,8 @@ checks:
       - active_config.profile.ref_id
       - profile.profile_id
     ignorable_for_commissioning: false
-  - check_id: config.runtime_config_hash_match
-    description: Active config runtime TOML hash must match the exact file selected for startup.
+  - check_id: config.calibration_hash_match
+    description: Active config calibration hash must match the loaded calibration bundle.
     severity: blocked
     operations:
       - deploy_preflight
@@ -92,10 +92,54 @@ checks:
       - switch_current
       - daemon_startup
       - motion_capable_start
-    reason_code: runtime_config_hash_mismatch
+    reason_code: calibration_hash_mismatch
     output_fields:
-      - active_config.runtime_config.sha256
-      - runtime_config.sha256
+      - active_config.calibration.sha256
+      - calibration.sha256
+    ignorable_for_commissioning: false
+  - check_id: config.safety_hash_match
+    description: Active config safety hash must match the loaded safety profile.
+    severity: blocked
+    operations:
+      - deploy_preflight
+      - install
+      - switch_current
+      - daemon_startup
+      - motion_capable_start
+    reason_code: safety_hash_mismatch
+    output_fields:
+      - active_config.safety.sha256
+      - safety.sha256
+    ignorable_for_commissioning: false
+  - check_id: config.runtime_hash_match
+    description: Active config runtime hash must match the loaded runtime config.
+    severity: blocked
+    operations:
+      - deploy_preflight
+      - install
+      - switch_current
+      - daemon_startup
+      - motion_capable_start
+    reason_code: runtime_hash_mismatch
+    output_fields:
+      - active_config.runtime.sha256
+      - runtime.sha256
+    ignorable_for_commissioning: false
+  - check_id: config.field_override_tightens_safety_limit
+    description: Field overrides must not relax, replace, remove, or bypass safety-critical limits.
+    severity: blocked
+    operations:
+      - deploy_preflight
+      - install
+      - switch_current
+      - daemon_startup
+      - motion_capable_start
+      - developer_commissioning_motion
+    reason_code: field_override_not_tightening_safety_limit
+    output_fields:
+      - active_config.field_overrides
+      - safety.limits
+      - override.direction
     ignorable_for_commissioning: false
   - check_id: profile.required_topology_present
     description: Platform profile must declare required compute, bus, sensor, backend, and time-sync topology.

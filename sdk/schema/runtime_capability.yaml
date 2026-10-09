@@ -10,7 +10,8 @@ compatibility:
   stable_id_policy: never_reuse
   migration_required: true
 hash:
-  canonicalization: semantic_projection_v2
+  canonicalization: yaml_to_canonical_json_v1
+  aggregate_member: true
   semantic_inputs:
     - schema_kind
     - schema_id
@@ -19,7 +20,7 @@ hash:
     - structures
 structures:
   - name: RuntimeCapabilityReport
-    description: Backend capability summary consumed by release/profile checker and diagnostics; report_hash is the canonical JSON SHA-256 with report_hash itself omitted.
+    description: Backend capability summary consumed by release/profile checker and diagnostics.
     fields:
       - name: report_id
         type: string

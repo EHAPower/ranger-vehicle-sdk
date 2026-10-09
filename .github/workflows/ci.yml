@@ -41,5 +41,4 @@ jobs:
               cargo clippy --locked --workspace --all-targets -- -D warnings
               cargo test --locked --workspace
               cargo build --locked --release
-              cargo package --locked -p ranger-schema-sources --list
             '

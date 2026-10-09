@@ -1,0 +1,97 @@
+schema_kind: ranger.schema.v1
+schema_id: parameter_config
+schema_version: ranger.parameter_config.v1
+title: Ranger parameter and config schema
+status: active
+owner: sdk/schema
+compatibility:
+  mode: strict
+  unknown_fields: reject
+  stable_id_policy: never_reuse
+  migration_required: true
+hash:
+  canonicalization: yaml_to_canonical_json_v1
+  aggregate_member: true
+  semantic_inputs:
+    - schema_kind
+    - schema_id
+    - schema_version
+    - compatibility
+    - structures
+structures:
+  - name: ParameterKey
+    description: Stable configuration key metadata before active config values are applied.
+    fields:
+      - name: key
+        type: string
+        required: true
+      - name: owner
+        type: string
+        required: true
+      - name: value_type
+        type: enum
+        required: true
+        enum_values:
+          - bool
+          - uint64
+          - float64
+          - string
+          - enum
+          - object
+      - name: unit
+        type: enum
+        required: false
+        enum_values:
+          - bool
+          - count
+          - ms
+          - hz
+          - m
+          - mm
+          - m_per_s
+          - mm_per_s
+          - percent
+      - name: safety_critical
+        type: bool
+        required: true
+      - name: default_allowed
+        type: bool
+        required: true
+  - name: FieldOverrideRule
+    description: Directional rule for authorized field overrides.
+    fields:
+      - name: override_id
+        type: string
+        required: true
+      - name: target_key
+        type: string
+        required: true
+      - name: direction
+        type: enum
+        required: true
+        enum_values:
+          - tighten_only
+          - non_safety_adjustment
+      - name: expires_at
+        type: timestamp_rfc3339
+        required: true
+      - name: audit_required
+        type: bool
+        required: true
+  - name: MigrationRule
+    description: Explicit schema migration metadata for config keys.
+    fields:
+      - name: from_schema_version
+        type: string
+        required: true
+      - name: to_schema_version
+        type: string
+        required: true
+      - name: migration_kind
+        type: enum
+        required: true
+        enum_values:
+          - reject
+          - rename
+          - transform
+          - add_required

@@ -4,4 +4,3 @@ pub mod bootstrap;
 pub mod codec;
 pub mod envelope;
 pub mod schema_id;
-pub mod schema_manifest;
