@@ -9,74 +9,45 @@
 
 **当前阶段：架构重构。** 仓库名称与职责作为设计基线；更名不表示目标能力、接口迁移或产品发行已完成。目标接口允许重设，不承担旧版本兼容承诺；当前行为仍以源码和实际验证为准。
 
-规范仓库地址：[EHAPower/ranger-vehicle-sdk](https://github.com/EHAPower/ranger-vehicle-sdk)。克隆目录为 `ranger-vehicle-sdk`。crate 名、socket 路径和 wire 合同不因仓库更名改变。
+规范仓库地址：[EHAPower/ranger-vehicle-sdk](https://github.com/EHAPower/ranger-vehicle-sdk)。本仓是 Ranger Rust Client、共享 `contracts` DTO、wire envelope、八份正式 schema 与 checker registry 的唯一源码 owner，没有常驻进程、硬件 backend 或 checker 算法。
 
-`ranger-vehicle-sdk` 是 Ranger 的客户端接口仓库，也是无常驻进程的库仓。当前内容从 `ranger-vehicle-runtime`（原 `ranger-server`）的 `a691ce1a999314eae5634876786de182915509cb` 提取，包含 Rust Client、共享 `contracts` 和机器可读 schema 输入。它不包含 Runtime 实现、硬件 backend、控制算法或部署配置。
+当前内容从 Runtime `11780dca1518fd9002e2bf8ff7e5179986234027` 迁入，保留 wire v2 和正式 schema 身份。[来源与归属](SOURCE_PROVENANCE.md)记录首次提取、当前迁移和验证归属。运行时与车辆级安全策略仍由 [ranger-vehicle-runtime](https://github.com/EHAPower/ranger-vehicle-runtime) 持有。
 
-这是一次接口提取的发布候选快照，尚不是协议 owner 已迁移完成的证明。迁移期间，`ranger-vehicle-runtime`（原 `ranger-server`）中的 `crates/contracts` 仍是当前生产消费者使用的来源；在 `ranger-vehicle-apps`、Runtime 和发布流程切换到此仓固定版本前，不得在两个位置独立演进 DTO、schema 或 wire bytes。任何协议改动必须先确定唯一 owner、迁移顺序、兼容策略和验证组合。
+## 当前接口
 
-## 当前可用接口
+- `sdk/rust` 的 `ranger-client`：同步 Linux Unix domain `SOCK_SEQPACKET` Control Client，提供 `connect`、`send_motion`、`heartbeat`、`request_mode`、`stop`、`clear_faults`、`query_operation`、`readiness` 和 `reset_eha_fault`。
+- `crates/contracts`：RNG1 wire v2 envelope、DTO 和严格 schema 身份；当前 DTO 手工对齐 YAML，自动 codegen 尚未实现。
+- `sdk/schema` 的 `ranger-schema-sources`：无依赖原始文本包，公开八份正式 YAML 和 registry，供 Runtime 的 build script、checker 和测试使用。
 
-- `sdk/rust` 的 `ranger-client`：同步 Linux Unix domain `SOCK_SEQPACKET` Client。
-- `crates/contracts`：RNG1 transport envelope、DTO 和 schema 身份类型。
-- `sdk/schema`：schema 源输入快照，包括九个对外 schema 和 checker registry metadata。
+Connect 对 `command_request`、`receipt_event`、`telemetry_diagnostics` 的正式 v2 version/hash 执行精确协商；缺失、重复或漂移会拒绝 Control session。motion、stop 和生命周期请求要求显式传入 Server 已观察到的 `expected_mode + command_epoch`，SDK 不缓存、猜测或自动重写它们。
 
-当前 `ranger-client` 的公开方法是 `ControlClient::connect`、`send_motion`、
-`heartbeat`、`stop` 和 `reset_eha_fault`。`contracts` 已定义
-`Resource::VehicleSuspension`，但 Rust Client 还没有 `send_suspension` 方法；
-不得把 DTO 枚举当成已交付的 suspension SDK API。
+`GateReceipt::Accepted` 和 `OperationReceipt::Accepted` 只证明 Server 接纳请求。operation 通过 `query_operation(operation_id)` 取得 terminal phase 和 backend confirmation，再以 `readiness()` 读取 mode / epoch；SDK receipt 不证明物理安全。physical E-Stop、safe-output 或 terminal-confirmation 能力缺失时，Runtime 必须保持 motion denied。SDK 不自动重连、重发 mutating request 或恢复旧动作。
 
-下列片段是 API 调用示意，不是可直接运行的程序。演练前须由调用方自行提供监听指定 socket 的无硬件 mock Server；本仓未提供该程序或内置 dry-run。参数仅是测试 fixture，不是部署默认值。`send_motion` 会提交运动请求，不得将该片段直接指向真实车辆端点；实际控制须先满足对应 Server profile 和操作前置条件。
+Rust Client 尚未提供 ReadOnly diagnostics 或 suspension 便捷 API；DTO 存在不表示调用能力已交付。完整调用边界见 [SDK 说明](sdk/README.md)，正式输入和 hash 规则见 [schema 说明](sdk/schema/README.md)。
 
-```rust
-use std::path::PathBuf;
+## 固定版本接入
 
-use ranger_client::{ClientConfig, ControlClient, VehicleMotionCommand};
+Runtime 和 Apps 在各自仓库的 `deps/ranger-vehicle-sdk` 使用 Git submodule，并以 Cargo path 引用本仓 package；gitlink 是源码版本真值，Cargo.lock 仍提交。集成仓 `ranger` 的直接 SDK gitlink 必须与两个消费者的嵌套 gitlink 一致。初始化使用 `git submodule update --init -- deps/ranger-vehicle-sdk`，不使用 `--remote`。
 
-let mut client = ControlClient::connect(ClientConfig {
-    socket_path: PathBuf::from("/tmp/ranger-sdk-mock.sock"),
-    max_frame_bytes: 65_536,
-})?;
-let receipt = client.send_motion(
-    "yard-low-speed.v1",
-    VehicleMotionCommand {
-        linear_velocity_mps: 0.8,
-        yaw_rate_radps: 0.15,
-    },
-)?;
-println!("{}: {:?}", receipt.receipt_id, receipt.status);
-# Ok::<(), ranger_client::ClientError>(())
+```toml
+[dependencies]
+contracts = { path = "deps/ranger-vehicle-sdk/crates/contracts" }
+ranger-client = { path = "deps/ranger-vehicle-sdk/sdk/rust" }
+ranger-schema-sources = { path = "deps/ranger-vehicle-sdk/sdk/schema" }
 ```
 
-Client 只通过 `ranger-vehicle-runtime` API 请求 control session、motion、stop 和 EHA 域故障复位；它不会打开 CAN、EtherCAT、S.Bus、MAVLink 或任何 backend。`contracts` 保留 diagnostics DTO，但当前 Rust Client 尚未提供 ReadOnly/diagnostics client。当前 `ConnectRequest.schemas` 发送空集合，Runtime 尚未实现 schema negotiation；schema 文件与 `SchemaId` 的存在不能说明运行时已协商兼容。
-
-`GateReceipt::Accepted` 仅表示 Server gate 接受请求。它不表示 backend 已执行、停止已被 backend 确认，或车辆已处于物理安全状态。当前 Client 只返回 gate receipt，没有 execution-status 或 diagnostics 查询 API；动作结果及停止证据须由部署环境的独立 Server 诊断/操作通道取得，不能由本 SDK receipt 推断。SDK 不自动重连、重发 mutating request 或恢复运动。
-
-当前接口尚未实现完整车辆级 `ModeRequest`、统一 resource claim、整车 stop confirmation 或 schema negotiation。这些能力不能由 SDK 文档或 schema 文件替代。
-
-## 目录
-
-```text
-crates/contracts/  共享 DTO、RNG1 envelope 和 schema 身份类型
-sdk/rust/          ranger-client Rust package
-sdk/schema/        机器可读 schema 输入
-sdk/docs/          接口边界与迁移说明
-sdk/examples/      SDK 使用示例约束
-```
+公共 DTO、schema 或 wire 变更必须在本仓维护，随后验证 Runtime / Apps 并更新组合 gitlink；消费者不维护独立副本。SDK 的 socket mock、DTO 和 codec 测试留在本仓；真实 Server 集成与正式 schema identity drift 测试留在 Runtime，SDK 不反向依赖 Server/core/checker。
 
 ## 本地验证
 
-在具备 Rust Linux 构建环境中执行：
+在 Linux Rust 开发环境的 SDK 仓库根目录执行：
 
 ```bash
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
-cargo build --locked --release
+cargo build --locked --workspace --release
+cargo package --locked -p ranger-schema-sources --list --allow-dirty
 ```
 
-`ranger-client` 依赖 Linux Unix domain `SOCK_SEQPACKET`；构建通过不证明目标 Server、profile 或硬件已经验证。
-
-## 迁移边界
-
-此仓添加到 `ranger` 集成仓只固定一次接口候选版本，不会自动让现有 path dependency 切换。下一步应先让 `ranger-vehicle-apps` 改为固定的 `ranger-vehicle-sdk` 依赖并验证 wire 兼容，再让 `ranger-vehicle-runtime` 消费同一版本，最后删除其重复来源。迁移完成前，Runtime 和 Apps 的实际发布组合仍须以各自仓库的锁定 revision 为准。
+`ranger-client` 依赖 Linux Unix domain `SOCK_SEQPACKET`。软件测试与构建通过只证明软件组合，不证明产品发行、目标 Server profile、backend stop confirmation 或实车验收。

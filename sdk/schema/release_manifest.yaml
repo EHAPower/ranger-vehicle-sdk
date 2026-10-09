@@ -1,6 +1,6 @@
 schema_kind: ranger.schema.v1
 schema_id: release_manifest
-schema_version: ranger.release_manifest.v1
+schema_version: ranger.release_manifest.v2
 title: Ranger release manifest schema
 status: active
 owner: sdk/schema
@@ -10,8 +10,7 @@ compatibility:
   stable_id_policy: never_reuse
   migration_required: true
 hash:
-  canonicalization: yaml_to_canonical_json_v1
-  aggregate_member: true
+  canonicalization: semantic_projection_v2
   semantic_inputs:
     - schema_kind
     - schema_id
@@ -22,6 +21,9 @@ structures:
   - name: ReleaseManifest
     description: Immutable release bundle metadata and supported profile/capability set.
     fields:
+      - name: schema_version
+        type: string
+        required: true
       - name: release_id
         type: string
         required: true

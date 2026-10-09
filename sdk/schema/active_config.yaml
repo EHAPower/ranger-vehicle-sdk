@@ -1,7 +1,7 @@
 schema_kind: ranger.schema.v1
 schema_id: active_config
-schema_version: ranger.active_config.v1
-title: Ranger active config schema
+schema_version: ranger.active_config.v2
+title: Ranger active configuration binding
 status: active
 owner: sdk/schema
 compatibility:
@@ -10,8 +10,7 @@ compatibility:
   stable_id_policy: never_reuse
   migration_required: true
 hash:
-  canonicalization: yaml_to_canonical_json_v1
-  aggregate_member: true
+  canonicalization: semantic_projection_v2
   semantic_inputs:
     - schema_kind
     - schema_id
@@ -20,8 +19,11 @@ hash:
     - structures
 structures:
   - name: ActiveConfig
-    description: Current release/profile/calibration/safety/runtime references and hashes.
+    description: Binds the selected release and profile to the exact runtime TOML consumed at startup.
     fields:
+      - name: schema_version
+        type: string
+        required: true
       - name: active_config_id
         type: string
         required: true
@@ -34,21 +36,11 @@ structures:
       - name: profile
         type: object
         required: true
-      - name: calibration
+      - name: runtime_config
         type: object
         required: true
-      - name: safety
-        type: object
-        required: true
-      - name: runtime
-        type: object
-        required: true
-      - name: field_overrides
-        type: array
-        required: true
-        items: FieldOverrideReference
   - name: ArtifactReference
-    description: Path, schema version, and hash for active config inputs.
+    description: Identity and location of the selected release or profile artifact.
     fields:
       - name: ref_id
         type: string
@@ -63,30 +55,10 @@ structures:
         type: sha256
         required: true
         unit: sha256
-  - name: FieldOverrideReference
-    description: Scoped field override that must tighten safety-critical limits.
+  - name: RuntimeConfigReference
+    description: SHA-256 of the exact runtime TOML bytes selected for startup.
     fields:
-      - name: override_id
-        type: string
+      - name: sha256
+        type: sha256
         required: true
-      - name: target_key
-        type: string
-        required: true
-      - name: direction
-        type: enum
-        required: true
-        enum_values:
-          - tighten_only
-          - non_safety_adjustment
-      - name: authorized_by
-        type: string
-        required: true
-      - name: reason
-        type: string
-        required: true
-      - name: expires_at
-        type: timestamp_rfc3339
-        required: true
-      - name: rollback_ref
-        type: string
-        required: true
+        unit: sha256

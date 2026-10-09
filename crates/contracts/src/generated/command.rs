@@ -1,8 +1,10 @@
-//! v1 ControlFrame 和 StopCommand DTO。
+//! v2 ControlFrame、StopCommand 和 EHA compatibility DTO。
 //!
-//! 对应 `sdk/schema/command_request.yaml` 的 `ControlFrame` 和 `OperationRequest(stop)`。
+//! 对应 `sdk/schema/command_request.yaml` 的 v2 command request contract。
 
 use serde::{Deserialize, Serialize};
+
+use super::lifecycle::OperationMode;
 
 /// 时钟域。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,6 +31,10 @@ pub struct ControlFrame {
     pub header: FrameHeader,
     pub sequence: u64,
     pub valid_for_ms: u64,
+    /// Compare-and-reject assertion; a ControlFrame never changes mode.
+    pub expected_mode: OperationMode,
+    /// Supervisor-owned command generation observed by the caller.
+    pub command_epoch: u64,
     pub profile_id: String,
     pub commands: Vec<VehicleCommand>,
 }
@@ -76,6 +82,10 @@ pub struct UnitSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StopCommand {
     pub header: FrameHeader,
+    pub sequence: u64,
+    pub valid_for_ms: u64,
+    pub expected_mode: OperationMode,
+    pub command_epoch: u64,
     pub reason_code: String,
 }
 
@@ -104,6 +114,8 @@ mod tests {
             },
             sequence: 7,
             valid_for_ms: 200,
+            expected_mode: OperationMode::Manual,
+            command_epoch: 3,
             profile_id: "yard-low-speed.v1".to_string(),
             commands: vec![VehicleCommand {
                 command_id: "cmd-1".to_string(),
@@ -132,6 +144,8 @@ mod tests {
         assert_eq!(decoded.sequence, 7);
         assert_eq!(decoded.commands.len(), 1);
         assert_eq!(decoded.header.source_clock, ClockDomain::Monotonic);
+        assert_eq!(decoded.expected_mode, OperationMode::Manual);
+        assert_eq!(decoded.command_epoch, 3);
     }
 
     #[test]
@@ -143,11 +157,16 @@ mod tests {
                 source_timestamp_ns: 2_000_000_000,
                 source_clock: ClockDomain::Monotonic,
             },
+            sequence: 8,
+            valid_for_ms: 200,
+            expected_mode: OperationMode::Manual,
+            command_epoch: 4,
             reason_code: "operator_stop".to_string(),
         };
         let bytes = bincode::serialize(&stop).unwrap();
         let decoded: StopCommand = bincode::deserialize(&bytes).unwrap();
         assert_eq!(decoded.reason_code, "operator_stop");
+        assert_eq!(decoded.command_epoch, 4);
     }
 
     #[test]

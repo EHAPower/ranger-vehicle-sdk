@@ -1,0 +1,8 @@
+[package]
+name = "ranger-schema-sources"
+description = "Ranger Vehicle SDK 的正式 schema 与 checker registry 源文本"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+readme = "README.md"
+include = ["Cargo.toml", "README.md", "src/lib.rs", "*.yaml"]

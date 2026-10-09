@@ -1,8 +1,9 @@
-//! v1 Session handshake 和 heartbeat DTO。
+//! v2 Session handshake、frozen grant 和 heartbeat DTO。
 
 use serde::{Deserialize, Serialize};
 
 use super::super::transport::bootstrap::SessionTypeRepr;
+use super::lifecycle::{OperationMode, SessionGrant};
 
 /// Session 建立请求。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +20,11 @@ pub struct SessionResponse {
     pub heartbeat_timeout_ms: u64,
     pub command_default_valid_for_ms: u64,
     pub command_max_valid_for_ms: u64,
+    /// Frozen authorization intersection for this session.
+    pub grant: SessionGrant,
+    /// The current supervisor state is explicit; session creation never enters an active mode.
+    pub operation_mode: OperationMode,
+    pub command_epoch: u64,
 }
 
 /// Session 响应状态。
@@ -67,10 +73,18 @@ mod tests {
             heartbeat_timeout_ms: 1000,
             command_default_valid_for_ms: 200,
             command_max_valid_for_ms: 500,
+            grant: SessionGrant {
+                allowed_modes: vec![OperationMode::Manual],
+                allowed_operations: vec![],
+                capability_hash: Some("sha256:capability".to_owned()),
+            },
+            operation_mode: OperationMode::Standby,
+            command_epoch: 1,
         };
         let bytes = bincode::serialize(&resp).unwrap();
         let decoded: SessionResponse = bincode::deserialize(&bytes).unwrap();
         assert_eq!(decoded.session_id, 12345);
         assert_eq!(decoded.heartbeat_interval_ms, 200);
+        assert_eq!(decoded.operation_mode, OperationMode::Standby);
     }
 }

@@ -1,14 +1,16 @@
 [package]
 name = "ranger-client"
-repository.workspace = true
 description = "Ranger Vehicle Runtime 的同步 Linux SOCK_SEQPACKET Client SDK"
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [dependencies]
 contracts = { workspace = true }
 nix = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 serde = { workspace = true }
+libc = "0.2"

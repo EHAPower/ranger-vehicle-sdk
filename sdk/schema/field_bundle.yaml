@@ -10,8 +10,7 @@ compatibility:
   stable_id_policy: never_reuse
   migration_required: true
 hash:
-  canonicalization: yaml_to_canonical_json_v1
-  aggregate_member: true
+  canonicalization: semantic_projection_v2
   semantic_inputs:
     - schema_kind
     - schema_id
@@ -19,61 +18,6 @@ hash:
     - compatibility
     - structures
 structures:
-  - name: FieldBundleManifest
-    description: Read-only evidence export manifest.
-    fields:
-      - name: bundle_id
-        type: string
-        required: true
-      - name: schema_version
-        type: string
-        required: true
-      - name: exported_at
-        type: timestamp_rfc3339
-        required: true
-      - name: vehicle_id
-        type: string
-        required: true
-      - name: release_id
-        type: string
-        required: true
-      - name: profile_id
-        type: string
-        required: true
-      - name: aggregate_schema_hash
-        type: sha256
-        required: true
-        unit: sha256
-      - name: check_registry_hash
-        type: sha256
-        required: true
-        unit: sha256
-      - name: segments
-        type: array
-        required: true
-        items: RecorderSegment
-      - name: redaction
-        type: array
-        required: true
-        items: RedactionRule
-  - name: RecorderSegment
-    description: DiagnosticsRecorder segment included in the bundle.
-    fields:
-      - name: segment_id
-        type: string
-        required: true
-      - name: monotonic_start_ns
-        type: uint64
-        required: true
-        unit: ns
-      - name: monotonic_end_ns
-        type: uint64
-        required: true
-        unit: ns
-      - name: sha256
-        type: sha256
-        required: true
-        unit: sha256
   - name: EvidenceReference
     description: Reference to target, HIL, bench, static vehicle, or field evidence.
     fields:
@@ -99,22 +43,6 @@ structures:
         type: array
         required: true
         items: string
-  - name: RedactionRule
-    description: Non-secret export filter applied before bundle publication.
-    fields:
-      - name: rule_id
-        type: string
-        required: true
-      - name: path
-        type: string
-        required: true
-      - name: action
-        type: enum
-        required: true
-        enum_values:
-          - keep
-          - redact
-          - omit
   - name: FieldBundleRecord
     description: Replayable checker readiness record embedded in diagnostics and field bundle exports.
     fields:

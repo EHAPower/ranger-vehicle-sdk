@@ -1,6 +1,6 @@
 schema_kind: ranger.schema.v1
 schema_id: command_request
-schema_version: ranger.command_request.v1
+schema_version: ranger.command_request.v2
 title: Ranger command request schema
 status: active
 owner: sdk/schema
@@ -10,8 +10,7 @@ compatibility:
   stable_id_policy: never_reuse
   migration_required: true
 hash:
-  canonicalization: yaml_to_canonical_json_v1
-  aggregate_member: true
+  canonicalization: semantic_projection_v2
   semantic_inputs:
     - schema_kind
     - schema_id
@@ -53,6 +52,19 @@ structures:
         type: uint64
         required: true
         unit: ms
+      - name: expected_mode
+        type: enum
+        required: true
+        enum_values:
+          - standby
+          - manual
+          - auto
+          - maintenance
+          - self_test
+      - name: command_epoch
+        type: uint64
+        required: true
+        unit: count
       - name: profile_id
         type: string
         required: true
@@ -100,14 +112,90 @@ structures:
         type: string
         required: true
   - name: StopCommand
-    description: Explicit stop or disable request for the active control session.
+    description: >-
+      Explicit safe-stop request. Accepted only starts an operation; terminal
+      backend confirmation is exposed through OperationEvent.
     fields:
       - name: header
         type: object
         required: true
+      - name: sequence
+        type: uint64
+        required: true
+        unit: count
+      - name: valid_for_ms
+        type: uint64
+        required: true
+        unit: ms
+      - name: expected_mode
+        type: enum
+        required: true
+        enum_values: [standby, manual, auto, maintenance, self_test]
+      - name: command_epoch
+        type: uint64
+        required: true
+        unit: count
       - name: reason_code
         type: string
         required: true
+  - name: ModeRequest
+    description: The only external request that can select an operation mode.
+    fields:
+      - name: header
+        type: object
+        required: true
+      - name: valid_for_ms
+        type: uint64
+        required: true
+        unit: ms
+      - name: expected_mode
+        type: enum
+        required: true
+        enum_values: [standby, manual, auto, maintenance, self_test]
+      - name: command_epoch
+        type: uint64
+        required: true
+        unit: count
+      - name: target_mode
+        type: enum
+        required: true
+        enum_values: [standby, manual, auto, maintenance, self_test]
+      - name: reason_code
+        type: string
+        required: true
+  - name: ClearFaultsRequest
+    description: Requests a supervised clear; the caller cannot assert that a fault disappeared.
+    fields:
+      - name: header
+        type: object
+        required: true
+      - name: valid_for_ms
+        type: uint64
+        required: true
+        unit: ms
+      - name: expected_mode
+        type: enum
+        required: true
+        enum_values: [standby, manual, auto, maintenance, self_test]
+      - name: command_epoch
+        type: uint64
+        required: true
+        unit: count
+      - name: reason_code
+        type: string
+        required: true
+  - name: OperationMode
+    description: Vehicle operation mode; normal command frames assert it and never change it.
+    fields:
+      - name: value
+        type: enum
+        required: true
+        enum_values:
+          - standby
+          - manual
+          - auto
+          - maintenance
+          - self_test
   - name: EhaFaultResetCommand
     description: >-
       Explicit reset of the EHA-domain fault latch (isolated variants) for the

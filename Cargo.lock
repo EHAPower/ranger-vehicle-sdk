@@ -157,10 +157,15 @@ name = "ranger-client"
 version = "0.1.0"
 dependencies = [
  "contracts",
+ "libc",
  "nix",
  "serde",
  "thiserror",
 ]
+
+[[package]]
+name = "ranger-schema-sources"
+version = "0.1.0"
 
 [[package]]
 name = "serde"
