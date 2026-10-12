@@ -20,6 +20,7 @@
 - `sdk/rust` 的 `ranger-client`：同步 Linux Unix domain `SOCK_SEQPACKET` Client。
 - `crates/contracts`：RNG1 transport envelope、DTO 和 schema 身份类型。
 - `sdk/schema`：schema 源输入快照，包括九个对外 schema 和 checker registry metadata。
+- `experimental/local-ipc-protocol`：与 RNG1 分离的 mock Runtime Unix `SOCK_SEQPACKET` 合同及 `LocalIpcClient`。Hello/Status 声明 Runtime 的 `clock_mode`，但 client expiry 始终使用 `linux.boot_monotonic`，不采用 mock logical cycle；连接成功、模拟结果和 host 接纳均不证明真实设备执行。
 
 当前 `ranger-client` 的公开方法是 `ControlClient::connect`、`send_motion`、
 `heartbeat`、`stop` 和 `reset_eha_fault`。`contracts` 已定义

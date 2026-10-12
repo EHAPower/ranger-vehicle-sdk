@@ -4,13 +4,23 @@
 
 ## 范围
 
-合同只表达固定数量 fixture 通道的 mock 目标、会话、接纳、状态和有身份的终态结果。`MockTarget` 中的数值是测试 fixture 通道值，不表示车辆运动学、设备命令、硬件执行或物理安全。Server 在握手中显式声明 `simulated: true` 与 `real_vehicle_capability: "unavailable"`。
+合同只表达固定数量 fixture 通道的 mock 目标、会话、接纳、状态和有身份的终态结果。`MockTarget` 中的数值是测试 fixture 通道值，不表示车辆运动学、设备命令、硬件执行或物理安全。Server 在握手中显式声明 `simulated: true`、`real_vehicle_capability: "unavailable"` 与 `clock_mode`。`clock_mode: "simulated"` 只说明 Runtime 使用 mock 逻辑周期；它不是实际 1 kHz、总线吞吐或设备执行证据。
 
-客户端必须使用 Linux boot monotonic 时钟域发送 `expires_at_ns`。该值是绝对截止时间；传输和排队会消耗它，Server 不会刷新 TTL。`accepted` 只表示进入 Runtime 的定义处理路径，最终结果须按 `operation_id` 查询，并且只允许原会话读取。
+客户端必须使用 Linux boot monotonic 时钟域发送 `expires_at_ns`。该值是绝对截止时间；传输和排队会消耗它，Server 不会刷新 TTL。即使 Server 声明 `clock_mode: "simulated"`，`cycle_id` 也只是逻辑身份，绝不能作为 expiry 或 TTL 时钟。`accepted` 只表示进入 Runtime 的定义处理路径，最终结果须按 `operation_id` 查询，并且只允许原会话读取。
 
 结果保存是有界的。若 Server 已知 `operation_id` 属于当前会话、但 Runtime 的终态记录已被淘汰，返回 `result_unknown`；这不表示操作未发生、失败或已经安全停止，也不允许客户端自动重发原请求。
 
 同一 boot/session 内，保留窗口中的同一 `request_id` 只有在完整消息内容相同才返回最初的接纳记录；内容不同会被拒绝，且不会重新提交 Runtime。记录被有界淘汰后，Server 仍按会话内单调 request ID 水位拒绝旧 ID，并把其结果视为未知；客户端不得借此重放副作用请求。
+
+## Rust 客户端
+
+`ranger_local_ipc_protocol::client::LocalIpcClient` 是本实验合同的同步 Linux 客户端。它使用实际 Unix `SOCK_SEQPACKET`，`connect(ClientConfig)` 自动完成唯一 Hello；仅当返回的 protocol、clock domain、`simulated: true` 与 `real_vehicle_capability: unavailable` 全部匹配时才保留连接和允许后续 mutation。Hello 返回固定的 `boot_id`、`session_id` 和 Runtime 根据 `SO_PEERCRED` 赋予的 `role`。`ClientConfig` 需要绝对 socket 路径、日志用途的 `client_label`、`max_packet_bytes` 与非零 `io_timeout`。客户端把后者设置为 `SO_SNDTIMEO` 和 `SO_RCVTIMEO`，超时后只报告 I/O 失败：调用方保留原操作身份并查询结果或记录 `Unknown`，不得自动重发 mutation。
+
+客户端提供 `status`、`acquire`、`takeover`、`submit_fixture`、`stop`、`release`、`clear_fault` 和 `result` 方法，也保留 `request(ClientPacket)` 给受限适配器。`Takeover` 只有 Runtime 映射为 manual 的 UID 可提交；autonomous 不能抢占 manual；observer 只能 `status` 和查询自己已经接纳的结果。角色不来自 packet 或客户端标签。`submit_fixture` 的数值仍只是八通道 mock fixture，Runtime 会拒绝非八通道或无效数据。
+
+`await_control_epoch(operation_id, expected_applied_epoch, expires_at_ns)` 为 Acquire/Takeover 提供窄的只读确认：每轮最多查询一次 Result，完成后查询一次 Status，轮间至少等待 1 ms。它要求调用方传入动作合同规定的精确 applied epoch：空闲 Acquire 保留提交时的 `expected_epoch`；Takeover 仅当该值小于 `u64::MAX` 时为精确加一。`u64::MAX` 没有后继，Runtime 会拒绝新授权，不能以饱和加一确认旧控制权。只有 Result 已完成且 Status 同时显示活动控制会话与该精确 epoch，才返回 `ControlEpochConfirmation::Confirmed`；不接受“任意变化后的 epoch”，避免其他来源接管被误认。原始 deadline 到达、`ResultUnknown`、失败、不匹配 packet 或 I/O 均返回 `Unknown`；它从不重发 mutation、创建新 lease 或刷新 TTL。
+
+`LocalIpcClient::abort_handle()` 返回可由另一线程保存的 `LocalIpcAbortHandle`；其 `abort()` 对原有 socket 执行 `SHUT_RDWR`。句柄只持有弱引用，不能延长 client/socket 生命周期；client 已析构时 Server 已可收到 EOF，句柄的后续 `abort()` 是无操作的幂等清理。它适用于正常 request 被客户端 mutex 阻塞时，令 Runtime 只观察并撤销该 exact session 的 lease。适配器必须把在途操作标为 `Unknown`、清除本地窗口，不能把它替代全车 `Stop`、自动重连或重试。`LocalIpcClient::abort()` 提供相同语义给未被 mutex 占用的调用者。
 
 ## 边界
 

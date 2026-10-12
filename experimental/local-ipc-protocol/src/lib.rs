@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod client;
+
 /// 实验性协议的唯一标识。
 pub const PROTOCOL: &str = "ranger.mock-runtime.seqpacket.v1";
 
@@ -33,6 +35,12 @@ pub enum ClientPacket {
         expected_epoch: u64,
         expires_at_ns: u64,
     },
+    /// 人工来源原子撤销当前 lease，并以新的 epoch 取得控制权。
+    Takeover {
+        request_id: u64,
+        expected_epoch: u64,
+        expires_at_ns: u64,
+    },
     /// 提交 fixture 目标。`expires_at_ns` 为原始绝对 monotonic 截止期。
     Target {
         request_id: u64,
@@ -45,6 +53,11 @@ pub enum ClientPacket {
     Stop { request_id: u64, reason: String },
     /// 请求清除可清除的 mock 软件故障；不会恢复会话或旧目标。
     ClearFault {
+        request_id: u64,
+        expected_epoch: u64,
+    },
+    /// 主动释放本会话自己的 lease；连接关闭也走同一语义，不能撤销其他会话。
+    Release {
         request_id: u64,
         expected_epoch: u64,
     },
@@ -64,6 +77,10 @@ pub enum ServerPacket {
         clock_domain: String,
         boot_id: u64,
         session_id: u64,
+        /// 由 Runtime 基于 `SO_PEERCRED` 和启动配置赋予的本地角色。
+        role: LocalRole,
+        /// Runtime 控制周期模式；逻辑模拟周期不改变本 packet 的 CLOCK_MONOTONIC 合同。
+        clock_mode: ClockMode,
         simulated: bool,
         real_vehicle_capability: RealVehicleCapability,
     },
@@ -81,6 +98,28 @@ pub enum ServerPacket {
     },
     /// packet 或当前会话无效；不会暗示请求未产生副作用。
     Error { code: ErrorCode, detail: String },
+}
+
+/// Runtime 根据 Unix peer UID 映射的固定本地来源角色。
+///
+/// 角色不由客户端 packet 声明，同一 UID 不能同时映射多个角色。
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalRole {
+    Manual,
+    Autonomous,
+    Observer,
+}
+
+/// Runtime 对外声明的控制周期模式。
+///
+/// 不论模式，客户端的 `expires_at_ns` 都位于 [`CLOCK_DOMAIN`]；`Simulated` 绝不把逻辑
+/// cycle 时间暴露为 TTL 时钟，也不表示真实频率或设备能力。
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClockMode {
+    Software,
+    Simulated,
 }
 
 /// 固定数量的 mock fixture 通道值。
@@ -137,6 +176,8 @@ pub enum OperationState {
 #[serde(deny_unknown_fields)]
 pub struct MockStatus {
     pub simulated: bool,
+    /// 与 Hello 相同的 Runtime 周期模式。
+    pub clock_mode: ClockMode,
     pub real_vehicle_capability: RealVehicleCapability,
     pub control_session_active: bool,
     pub fault_latched: bool,
@@ -230,6 +271,21 @@ mod tests {
             },
         };
         assert_eq!(decode_client(&encode(&packet).unwrap()).unwrap(), packet);
+    }
+
+    #[test]
+    fn takeover_and_release_are_explicit_packets() {
+        let packet = ClientPacket::Takeover {
+            request_id: 8,
+            expected_epoch: 3,
+            expires_at_ns: 456_789,
+        };
+        assert_eq!(decode_client(&encode(&packet).unwrap()).unwrap(), packet);
+        let release = ClientPacket::Release {
+            request_id: 9,
+            expected_epoch: 4,
+        };
+        assert_eq!(decode_client(&encode(&release).unwrap()).unwrap(), release);
     }
 
     #[test]
