@@ -2,32 +2,22 @@
 
 # Ranger Vehicle SDK contribution guide
 
-## 主干重构与 SOP 基线
+## 基线范围
 
-- `main` 正在进行整体架构重构，后续设计与实现迭代在此推进；允许重设接口，不承担旧版本兼容承诺。目标能力仍须以实际实现与验证为准。
-- `release/sop-v1` 承接 SOP 维护，后续仅按需修复问题，不直接合入 main 的整体重构；跨仓修复须明确配套版本与验证。
-- 2026-09-29 本次 SOP 基线 commit：[`5d6aaa4ebfe36a78fe0200754c72f04a8b4030c3`](https://github.com/EHAPower/ranger-vehicle-sdk/commit/5d6aaa4ebfe36a78fe0200754c72f04a8b4030c3)。这是同步远端并合入本地已有提交后的切分点，不随 main 推进更新。
-- 分支名称与基线记录不表示已经完成产品发行或实车验收；组件组合由 `ranger` 集成仓的 gitlink 固定。
+本仓是无运行构件的 SDK 架构基线。当前没有 Cargo workspace、协议、DTO、schema、示例、测试或常驻进程。历史实现仅可通过 Git 的 `release/sop-v1` 与相关提交追溯，不能恢复、复制或兼容旧合同。
 
-**当前阶段：架构重构。** 仓库名称与职责作为设计基线；更名不表示目标能力、接口迁移或产品发行已完成。目标接口允许重设，不承担旧版本兼容承诺；当前行为仍以源码和实际验证为准。
+不要为占位建立空 crate、未消费的 schema、假 client 或第二套 DTO。新接口只能在 Runtime owner、实际 App 消费者、版本组合和验证路径明确后创建。
 
-`ranger-vehicle-sdk` 面向 SDK 用户和接口维护者。它只包含 Client library、共享 DTO 和 schema 输入，没有常驻进程。车辆级硬件生命周期与安全裁决仍由 `ranger-vehicle-runtime`（原 `ranger-server`）负责。
+## SDK 边界
 
-当前新 mock 软件组合使用本仓 `experimental/local-ipc-protocol`：Apps 固定 Git revision，Runtime 从 `sdk` gitlink 以 path 依赖。`sdk/rust`、`crates/contracts` 和 `sdk/schema` 是保留的 RNG1 候选快照，不是当前 mock Runtime 的合同；两组协议不兼容，不能混用。
+- SDK 是各车辆 App 进程内链接的客户端库，不是 daemon、消息总线、systemd 服务、Cloud client 或硬件资源 owner。
+- SDK 只能通过 Runtime 的公开本地 API 或协议通信；不得打开 CAN、EtherCAT、S.Bus、MAVLink、执行器、传感器或其他硬件资源。
+- Runtime 不可用时，SDK 不得绕过它访问硬件、恢复旧会话、lease、epoch 或动作。
+- 未来 mutating request 必须有稳定操作身份；超时或传输失败只能表达 `Unknown`，不得自动重连后重发、推断未生效或恢复旧控制权。
+- `Accepted`、主机应用、设备执行、完成、停止确认和物理安全必须分开表达。
 
-目标部署采用 Ubuntu + PREEMPT_RT，但 SDK 不是 systemd 服务管理、Maintenance 运维、RT 调度或硬件资源 owner。各车辆 App 进程内链接 SDK，并经 Unix IPC 请求 Runtime；Maintenance 仅在 Runtime 在线时使用已实现的 SDK 配置或诊断接口。Runtime 不可用时，SDK 不得绕过它访问执行器、GR01 或其他硬件。
+## 维护方式
 
-## 变更边界
+本仓只保留根 `AGENTS.md` 作为治理规则。根 README 是当前职责的唯一说明；代码、合同和文档在实际落地时由唯一 owner 同步创建。
 
-- 不在此仓加入 CAN、EtherCAT、S.Bus、MAVLink、硬件 backend、Server 内部模块或直接执行硬件动作的示例。
-- `experimental/local-ipc-protocol` 的 wire bytes 与错误语义是当前 mock 组合的跨仓接口。`contracts` 的 RNG1 envelope、DTO、错误语义和 `sdk/schema` metadata 是保留的旧线候选；若恢复该线迁移，必须先确定唯一 owner、发布顺序、兼容版本和消费者验证，不能让并行副本独立演进。
-- schema 身份、文件 hash 或 YAML 存在不表示 code generation、drift gate 或运行期 negotiation 已实现。不得以文档或 schema 补写未落地的 Runtime 行为。
-- `Accepted`、backend committed、动作完成、stop confirmation 和物理安全是不同状态；SDK API、示例和错误处理必须分别表达。
-- Client 只能通过 Server API 通信。它不得自动重发非幂等请求、恢复旧控制权或绕过 Server safety gate。
-- systemd、journald、cgroup/procfs 的使用属于 Maintenance 与部署配置；不得把它们包装成 SDK 服务能力，或把进程保活、RT 线程调度写成 SDK 合同。
-
-## 验证与文档
-
-- 修改 Rust 代码时运行格式检查、Clippy、测试和 release build；平台边界仍须单独验证。
-- 修改 schema、DTO 或 wire bytes 时，同步记录兼容影响和所有已知消费者的验证结论。
-- 文档只描述已实现、已验证或明确标记为目标的状态。真实硬件、部署和外部服务操作需要独立授权和相应 SOP。
+开始工作时检查分支、HEAD、暂存区和工作区，保留无关修改。使用 `devbox` 进行开发和验证。未经用户明确要求不得提交、推送、改写共享历史或使用破坏性 Git 操作。
