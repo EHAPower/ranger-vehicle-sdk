@@ -1,3 +1,5 @@
+<!-- Copyright The ranger Contributors -->
+
 # Ranger Vehicle SDK contribution guide
 
 ## 主干重构与 SOP 基线
@@ -9,15 +11,20 @@
 
 **当前阶段：架构重构。** 仓库名称与职责作为设计基线；更名不表示目标能力、接口迁移或产品发行已完成。目标接口允许重设，不承担旧版本兼容承诺；当前行为仍以源码和实际验证为准。
 
-`ranger-vehicle-sdk` 面向 SDK 用户和接口维护者。它只包含 Client library、共享 DTO 和 schema 输入，没有常驻进程。车辆级硬件生命周期与安全裁决仍由 `ranger-vehicle-runtime`（原 `ranger-server`）负责；在接口迁移完成前，它仍是实际生产消费者使用的来源。
+`ranger-vehicle-sdk` 面向 SDK 用户和接口维护者。它只包含 Client library、共享 DTO 和 schema 输入，没有常驻进程。车辆级硬件生命周期与安全裁决仍由 `ranger-vehicle-runtime`（原 `ranger-server`）负责。
+
+当前新 mock 软件组合使用本仓 `experimental/local-ipc-protocol`：Apps 固定 Git revision，Runtime 从 `sdk` gitlink 以 path 依赖。`sdk/rust`、`crates/contracts` 和 `sdk/schema` 是保留的 RNG1 候选快照，不是当前 mock Runtime 的合同；两组协议不兼容，不能混用。
+
+目标部署采用 Ubuntu + PREEMPT_RT，但 SDK 不是 systemd 服务管理、Maintenance 运维、RT 调度或硬件资源 owner。各车辆 App 进程内链接 SDK，并经 Unix IPC 请求 Runtime；Maintenance 仅在 Runtime 在线时使用已实现的 SDK 配置或诊断接口。Runtime 不可用时，SDK 不得绕过它访问执行器、GR01 或其他硬件。
 
 ## 变更边界
 
 - 不在此仓加入 CAN、EtherCAT、S.Bus、MAVLink、硬件 backend、Server 内部模块或直接执行硬件动作的示例。
-- `contracts` 的 envelope、DTO、错误语义和 `sdk/schema` 的 metadata 都是跨仓接口。在迁移完成前，`ranger-vehicle-runtime`（原 `ranger-server`）仍有当前生产消费者使用的同源副本；修改前必须确定唯一 owner、发布顺序、兼容版本和消费者验证，不能让两处独立演进。
+- `experimental/local-ipc-protocol` 的 wire bytes 与错误语义是当前 mock 组合的跨仓接口。`contracts` 的 RNG1 envelope、DTO、错误语义和 `sdk/schema` metadata 是保留的旧线候选；若恢复该线迁移，必须先确定唯一 owner、发布顺序、兼容版本和消费者验证，不能让并行副本独立演进。
 - schema 身份、文件 hash 或 YAML 存在不表示 code generation、drift gate 或运行期 negotiation 已实现。不得以文档或 schema 补写未落地的 Runtime 行为。
 - `Accepted`、backend committed、动作完成、stop confirmation 和物理安全是不同状态；SDK API、示例和错误处理必须分别表达。
 - Client 只能通过 Server API 通信。它不得自动重发非幂等请求、恢复旧控制权或绕过 Server safety gate。
+- systemd、journald、cgroup/procfs 的使用属于 Maintenance 与部署配置；不得把它们包装成 SDK 服务能力，或把进程保活、RT 线程调度写成 SDK 合同。
 
 ## 验证与文档
 

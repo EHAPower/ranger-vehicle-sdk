@@ -1,3 +1,5 @@
+<!-- Copyright The ranger Contributors -->
+
 # Ranger Vehicle SDK
 
 ## 主干重构与 SOP 基线
@@ -11,16 +13,27 @@
 
 规范仓库地址：[EHAPower/ranger-vehicle-sdk](https://github.com/EHAPower/ranger-vehicle-sdk)。克隆目录为 `ranger-vehicle-sdk`。crate 名、socket 路径和 wire 合同不因仓库更名改变。
 
-`ranger-vehicle-sdk` 是 Ranger 的客户端接口仓库，也是无常驻进程的库仓。当前内容从 `ranger-vehicle-runtime`（原 `ranger-server`）的 `a691ce1a999314eae5634876786de182915509cb` 提取，包含 Rust Client、共享 `contracts` 和机器可读 schema 输入。它不包含 Runtime 实现、硬件 backend、控制算法或部署配置。
+`ranger-vehicle-sdk` 是 Ranger 的客户端接口仓库，也是无常驻进程的库仓。它不包含 Runtime 实现、硬件 backend、控制算法或部署配置。
 
-这是一次接口提取的发布候选快照，尚不是协议 owner 已迁移完成的证明。迁移期间，`ranger-vehicle-runtime`（原 `ranger-server`）中的 `crates/contracts` 仍是当前生产消费者使用的来源；在 `ranger-vehicle-apps`、Runtime 和发布流程切换到此仓固定版本前，不得在两个位置独立演进 DTO、schema 或 wire bytes。任何协议改动必须先确定唯一 owner、迁移顺序、兼容策略和验证组合。
+本仓保留两组不兼容的接口，必须分别阅读和演进：
 
-## 当前可用接口
+- **当前新 mock 软件组合**使用 `experimental/local-ipc-protocol`。Apps 以本仓固定 Git revision 依赖它，Runtime 从其 `sdk/experimental/local-ipc-protocol` gitlink 以 path 依赖它。
+- **RNG1 候选快照**是从 `ranger-vehicle-runtime`（原 `ranger-server`）的 `a691ce1a999314eae5634876786de182915509cb` 提取的 `sdk/rust`、`crates/contracts` 与 `sdk/schema`。它不属于当前 mock Runtime 的依赖图，也不与实验协议兼容。
 
-- `sdk/rust` 的 `ranger-client`：同步 Linux Unix domain `SOCK_SEQPACKET` Client。
-- `crates/contracts`：RNG1 transport envelope、DTO 和 schema 身份类型。
-- `sdk/schema`：schema 源输入快照，包括九个对外 schema 和 checker registry metadata。
-- `experimental/local-ipc-protocol`：与 RNG1 分离的 mock Runtime Unix `SOCK_SEQPACKET` 合同及 `LocalIpcClient`。Hello/Status 声明 Runtime 的 `clock_mode`，但 client expiry 始终使用 `linux.boot_monotonic`，不采用 mock logical cycle；连接成功、模拟结果和 host 接纳均不证明真实设备执行。
+RNG1 的后续迁移若恢复推进，才需要重新确定唯一 owner、消费者、发布顺序、兼容策略和验证组合；不得把这些旧线约束写成当前 Apps 或 Runtime 正在使用 RNG1 的事实。
+
+## 目标产品中的位置
+
+Ranger 的目标部署为 Ubuntu + PREEMPT_RT。SDK 仍只是各车辆 App 进程内链接的客户端库：App 先调用 SDK，SDK 再通过 Unix IPC 请求 Runtime。它不是守护进程、消息总线、systemd 服务管理器或 RT 线程/硬件资源 owner。
+
+Maintenance 是一个特殊车辆 App。Runtime 在线时，它可使用未来的 SDK 配置或诊断接口；这不表示当前 Rust Client 已提供此类接口。Runtime 停止或损坏时，本地诊断与软件恢复由 Maintenance 和 systemd 继续完成，SDK 不绕过 Runtime 打开 CAN、EtherCAT、LinkX、GR01 或其他硬件，也不恢复旧会话、lease、epoch 或动作。
+
+## 接口状态
+
+- `experimental/local-ipc-protocol` 是当前 mock Runtime Unix `SOCK_SEQPACKET` 合同及 `LocalIpcClient`。它与 RNG1 分离；Hello/Status 声明 Runtime 的 `clock_mode`，但 client expiry 始终使用 `linux.boot_monotonic`，不采用 mock logical cycle。连接成功、模拟结果和 host 接纳均不证明真实设备执行。
+- `sdk/rust` 的 `ranger-client`、`crates/contracts` 和 `sdk/schema` 是保留的 RNG1 候选快照，分别包含同步 Linux Unix domain `SOCK_SEQPACKET` Client、RNG1 transport envelope/DTO/schema 身份类型，以及九个 schema 和 checker registry metadata。它们不是当前 mock 组合的合同。
+
+### 保留的 RNG1 候选快照
 
 当前 `ranger-client` 的公开方法是 `ControlClient::connect`、`send_motion`、
 `heartbeat`、`stop` 和 `reset_eha_fault`。`contracts` 已定义
@@ -49,7 +62,7 @@ println!("{}: {:?}", receipt.receipt_id, receipt.status);
 # Ok::<(), ranger_client::ClientError>(())
 ```
 
-Client 只通过 `ranger-vehicle-runtime` API 请求 control session、motion、stop 和 EHA 域故障复位；它不会打开 CAN、EtherCAT、S.Bus、MAVLink 或任何 backend。`contracts` 保留 diagnostics DTO，但当前 Rust Client 尚未提供 ReadOnly/diagnostics client。当前 `ConnectRequest.schemas` 发送空集合，Runtime 尚未实现 schema negotiation；schema 文件与 `SchemaId` 的存在不能说明运行时已协商兼容。
+Client 只通过 `ranger-vehicle-runtime` API 请求 control session、motion、stop 和 EHA 域故障复位；它不会打开 CAN、EtherCAT、S.Bus、MAVLink 或任何 backend。`contracts` 保留 diagnostics DTO，但当前 Rust Client 尚未提供 ReadOnly/diagnostics client；目标中 Maintenance 的在线诊断入口仍待 Runtime 和 SDK 一起落地。当前 `ConnectRequest.schemas` 发送空集合，Runtime 尚未实现 schema negotiation；schema 文件与 `SchemaId` 的存在不能说明运行时已协商兼容。
 
 `GateReceipt::Accepted` 仅表示 Server gate 接受请求。它不表示 backend 已执行、停止已被 backend 确认，或车辆已处于物理安全状态。当前 Client 只返回 gate receipt，没有 execution-status 或 diagnostics 查询 API；动作结果及停止证据须由部署环境的独立 Server 诊断/操作通道取得，不能由本 SDK receipt 推断。SDK 不自动重连、重发 mutating request 或恢复运动。
 
@@ -80,4 +93,4 @@ cargo build --locked --release
 
 ## 迁移边界
 
-此仓添加到 `ranger` 集成仓只固定一次接口候选版本，不会自动让现有 path dependency 切换。下一步应先让 `ranger-vehicle-apps` 改为固定的 `ranger-vehicle-sdk` 依赖并验证 wire 兼容，再让 `ranger-vehicle-runtime` 消费同一版本，最后删除其重复来源。迁移完成前，Runtime 和 Apps 的实际发布组合仍须以各自仓库的锁定 revision 为准。
+当前 mock 组合的依赖版本由 Apps 的 Git revision 和 Runtime 的 `sdk` gitlink 固定。RNG1 候选快照不会自动替换该组合；只有明确启动 RNG1 迁移时，才应建立独立的 owner、版本、消费者和 wire 兼容验证计划。

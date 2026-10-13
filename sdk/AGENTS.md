@@ -1,3 +1,5 @@
+<!-- Copyright The ranger Contributors -->
+
 # SDK 目录规则
 
 本目录是 Ranger Client SDK 的接口边界。它面向客户、上层系统和运维工具，只包含
@@ -6,11 +8,10 @@ Client library、共享 contracts、schema 输入和 SDK 文档；不要引入 S
 
 ## 迁移状态
 
-本仓是从 `ranger-vehicle-runtime`（原 `ranger-server`）提取的候选快照。
-`ranger-vehicle-apps` 和当前 Runtime 仍使用其同源 `contracts` / schema；消费者尚未
-切换前，本目录不是已完成迁移后的唯一协议 owner。
-不得在两处独立修改 DTO、schema、wire bytes 或兼容规则。变更必须先确定 owner、
-固定版本、消费者顺序与验证证据。
+本目录是从 `ranger-vehicle-runtime`（原 `ranger-server`）提取的 RNG1 候选快照。
+当前 Apps 与 Runtime mock 软件组合使用上层 `experimental/local-ipc-protocol`，并不消费本目录的
+`contracts`、schema 或 `ranger-client`。本目录不是当前 mock 合同的 owner，也不能与实验协议混用。
+若恢复 RNG1 迁移，变更前必须先确定 owner、固定版本、消费者顺序与验证证据；不得让并行副本独立演进。
 
 ## SDK 边界
 

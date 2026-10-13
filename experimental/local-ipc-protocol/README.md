@@ -1,6 +1,8 @@
+<!-- Copyright The ranger Contributors -->
+
 # `ranger-local-ipc-protocol`
 
-这是 Ranger Runtime 重写期间的**实验性 mock 软件运行时**本地协议合同。它只在 Linux Unix `SOCK_SEQPACKET` 上使用 JSON packet；每个 packet 恰好是一条 JSON 消息。协议标识为 `ranger.mock-runtime.seqpacket.v1`，与 SDK 旧 snapshot 中的 RNG1/bincode 合同完全分离，二者不兼容。
+这是 Ranger Runtime 重写期间的**实验性 mock 软件运行时**本地协议合同。它只在 Linux Unix `SOCK_SEQPACKET` 上使用 JSON packet；每个 packet 恰好是一条 JSON 消息。协议标识为 `ranger.mock-runtime.seqpacket.v1`，与 SDK 旧 snapshot 中的 RNG1/bincode 合同完全分离，二者不兼容。它不定义目标产品的 Maintenance、systemd、Ubuntu + PREEMPT_RT 线程策略或任何硬件所有权。
 
 ## 范围
 
