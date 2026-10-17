@@ -1,6 +1,6 @@
 // Copyright The ranger Contributors
 
-//! Ranger Runtime 的无业务本地 Unix IPC 客户端协议。
+//! 保留的旧 Runtime 本地 Unix IPC 客户端协议；不是新底盘 socket 合同。
 
 #[cfg(target_os = "linux")]
 use std::ffi::CString;
