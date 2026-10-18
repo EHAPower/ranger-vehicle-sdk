@@ -4,7 +4,7 @@
 
 ## 基线范围
 
-`ranger-vehicle-sdk` 的目标是为上层车辆控制调用提供统一 SDK。它不定义 `ranger-vehicle-chassis-driver` 的本机 socket 协议，也不是访问底盘驱动的必经层。车辆模型和控制计算归上层控制实现；SDK 的具体 API、调用方式及实现组织随实际消费者确定。
+`ranger-vehicle-sdk` 的目标是为上层车辆控制调用提供统一 SDK。它不定义 `ranger-vehicle-base` 中 Chassis Driver 的本机 socket 协议，也不是访问底盘驱动的必经层。车辆模型和控制计算归 `ranger-vehicle-apps` 的上层控制实现；SDK 的具体 API、调用方式及实现组织随实际消费者确定。
 
 当前代码保留的是旧 `Status`/`Probe` Runtime 框架的 DTO、帧编解码和一次性客户端，现有调用者仍依赖它。该实现不是新底盘接口的合同或代码来源，不能据此扩展、复制或兼容旧合同。
 
@@ -13,7 +13,7 @@
 ## SDK 边界
 
 - SDK 不是 daemon、消息总线、systemd 服务、Cloud client 或硬件资源 owner；不得打开 CAN、EtherCAT、S.Bus、MAVLink、执行器、传感器或其他硬件资源。
-- 新底盘 socket 的 wire 合同仅由 `ranger-vehicle-chassis-driver` 的 `docs/本地协议.md` 维护。控制实现、Maintenance 和 Telemetry 可按该合同直接访问底盘驱动；SDK 不代理或重定义该路径。
+- 新底盘 socket 的 wire 合同仅由 `ranger-vehicle-base/chassis-driver/docs/本地协议.md` 维护。上层控制实现及 Base 内有明确消费者的服务可按该合同访问底盘驱动；SDK 不代理或重定义该路径。
 - 新接口如包含变异请求，必须有稳定操作身份；超时或传输失败只能表达 `Unknown`，不得自动重连后重发、推断未生效或恢复旧控制权。`Accepted`、主机应用、设备执行、完成、停止确认和物理安全必须分开表达。
 
 ## 维护方式
