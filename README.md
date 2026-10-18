@@ -2,9 +2,9 @@
 
 # Ranger Vehicle SDK
 
-`ranger-vehicle-sdk` 的目标定位是上层车辆控制统一 SDK，为 Remote 与业务 App 提供车辆级调用接口。车辆模型和控制计算归 `ranger-vehicle-apps` 的上层控制实现；SDK 的具体 API、调用方式及实现组织尚待确定。本仓不定义 `ranger-vehicle-base` 中 Chassis Driver 的本机 socket 协议，也不是调用底盘驱动的必经层。
+`ranger-vehicle-sdk` 的目标定位是上层车辆控制统一 SDK，为 Remote 与业务 App 提供车辆级调用接口。车辆模型和控制计算归 `ranger-vehicle-apps` 的上层控制实现；SDK 的具体 API、调用方式及实现组织尚待确定。本仓不定义 `ranger-vehicle-base` 中 Chassis 的本机 socket 协议，也不是调用底盘服务的必经层。
 
-底盘 socket 协议由 `ranger-vehicle-base/chassis-driver/docs/本地协议.md` 唯一维护。上层控制实现及 Base 内有明确消费者的服务可按该合同访问底盘驱动；SDK 不代理、重定义或强制这些调用经过自己。
+底盘 socket 协议由 `ranger-vehicle-base/chassis/docs/本地协议.md` 唯一维护。上层控制实现及 Base 内有明确消费者的服务可按该合同访问底盘服务；SDK 不代理、重定义或强制这些调用经过自己。
 
 ## 保留的旧框架
 
