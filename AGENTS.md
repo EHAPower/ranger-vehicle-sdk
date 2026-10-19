@@ -13,7 +13,7 @@
 ## SDK 边界
 
 - SDK 不是 daemon、消息总线、systemd 服务、Cloud client 或硬件资源 owner；不得打开 CAN、EtherCAT、S.Bus、MAVLink、执行器、传感器或其他硬件资源。
-- 新底盘 socket 的 wire 合同仅由 `ranger-vehicle-base/chassis/docs/本地协议.md` 维护。上层控制实现及 Base 内有明确消费者的服务可按该合同访问底盘服务；SDK 不代理或重定义该路径。
+- 新底盘 socket 的 wire 合同仅由 `ranger-vehicle-base/chassis/README.md` 的“本地协议”章节 维护。上层控制实现及 Base 内有明确消费者的服务可按该合同访问底盘服务；SDK 不代理或重定义该路径。
 - 新接口如包含变异请求，必须有稳定操作身份；超时或传输失败只能表达 `Unknown`，不得自动重连后重发、推断未生效或恢复旧控制权。`Accepted`、主机应用、设备执行、完成、停止确认和物理安全必须分开表达。
 
 ## 维护方式
